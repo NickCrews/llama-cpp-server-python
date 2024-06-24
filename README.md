@@ -30,6 +30,14 @@ server.stop() # or use a context manager as above
 
 For detailed API, read the source code.
 
+## Install
+
+For now, install directly from source:
+
+`python -m pip install git+https://github.com/NickCrews/llama-cpp-server-python@00cc5ece8783848139d41fb7f9c5e5c9b7a62686`
+
+I recommend using a static SHA for stability, but you could also do `@main` to be lazy.
+
 ## Motivation
 
 I has a few requirements:

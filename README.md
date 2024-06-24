@@ -33,7 +33,7 @@ For detailed API, read the source code.
 ## Install
 
 This only currently works on Linux and Mac. File an issue if you want a pointer on
-what needs to happen to make this work.
+what needs to happen to make Windows work.
 
 For now, install directly from source:
 

@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 _SCRIPT = """
-curl -s https://raw.githubusercontent.com/NickCrews/llama.cpp/dcd044206696c4c8ec0620f2376f80daa608179b/download-release.sh | bash -s -- {dest_dir} {options}
+curl -s https://raw.githubusercontent.com/NickCrews/llama.cpp/ea325e0eefb30b9d9cc8cdcd2ca227c71e063d2c/scripts/download-release.sh | bash -s -- {dest_dir} {options}
 """
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def download_binary(
     """
     Download the llama.cpp server binary.
 
-    Uses https://raw.githubusercontent.com/NickCrews/llama.cpp/dcd044206696c4c8ec0620f2376f80daa608179b/download-release.sh
+    Uses https://raw.githubusercontent.com/NickCrews/llama.cpp/ea325e0eefb30b9d9cc8cdcd2ca227c71e063d2c/scripts/download-release.sh
     to download the binary.
 
     Parameters
@@ -55,6 +55,8 @@ def download_binary(
         script = _SCRIPT.format(dest_dir=tmpdir, options=options_str)
         logger.info(f"Downloading llama.cpp server binary using '{script}'")
         completed = subprocess.run(script, shell=True, check=True, capture_output=True)
+        print(completed.stdout)
+        print(completed.stderr)
         logger.info(completed.stdout)
         logger.info(completed.stderr)
         raw_path = tmpdir + "/llama-server"

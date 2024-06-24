@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 _SCRIPT = """
-curl -s https://raw.githubusercontent.com/NickCrews/llama.cpp/ea325e0eefb30b9d9cc8cdcd2ca227c71e063d2c/scripts/download-release.sh | bash -s -- {dest_dir} {options}
+curl -s https://raw.githubusercontent.com/NickCrews/llama.cpp/a6821563e817b75223b318a136c67e8a492b1946/scripts/download-release.sh | bash -s -- {dest_dir} {options}
 """
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def download_binary(
     """
     Download the llama.cpp server binary.
 
-    Uses https://raw.githubusercontent.com/NickCrews/llama.cpp/ea325e0eefb30b9d9cc8cdcd2ca227c71e063d2c/scripts/download-release.sh
+    Uses https://raw.githubusercontent.com/NickCrews/llama.cpp/a6821563e817b75223b318a136c67e8a492b1946/scripts/download-release.sh
     to download the binary.
 
     Parameters

@@ -1,0 +1,49 @@
+name: Tests and Lints
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.12"
+      - name: Install pdm
+        run: python -m pip install pdm
+      - name: Install project
+        run: pdm install
+      - name: ruff check
+        run: pdm run ruff check
+      - name: ruff format
+        run: pdm run ruff format --check
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.12"] # min and max versions, skip the middles
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pdm
+        run: python -m pip install pdm
+      - name: Install project
+        run: pdm install
+      - name: Run tests
+        run: pdm run pytest

@@ -32,7 +32,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # windows isn't supported in the download-release.sh script from llama.cpp.
+        # See _binary.py for more info
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.8", "3.12"] # min and max versions, skip the middles
     runs-on: ${{ matrix.os }}
     steps:

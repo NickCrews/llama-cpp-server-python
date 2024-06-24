@@ -32,6 +32,9 @@ For detailed API, read the source code.
 
 ## Install
 
+This only currently works on Linux and Mac. File an issue if you want a pointer on
+what needs to happen to make this work.
+
 For now, install directly from source:
 
 `python -m pip install git+https://github.com/NickCrews/llama-cpp-server-python@00cc5ece8783848139d41fb7f9c5e5c9b7a62686`

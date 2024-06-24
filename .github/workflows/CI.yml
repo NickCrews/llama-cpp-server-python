@@ -46,4 +46,4 @@ jobs:
       - name: Install project
         run: pdm install
       - name: Run tests
-        run: pdm run pytest
+        run: pdm run pytest --log-cli-level DEBUG

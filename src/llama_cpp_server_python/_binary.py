@@ -58,4 +58,6 @@ def download_binary(
         logger.info(completed.stdout)
         logger.info(completed.stderr)
         raw_path = tmpdir + "/llama-server"
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(raw_path, dest)

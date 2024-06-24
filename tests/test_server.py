@@ -42,7 +42,7 @@ def _check_server(server: Server):
     assert "choices" in data
 
 
-@pytest.mark.parametrize("port", [None, 6000])
+@pytest.mark.parametrize("port", [8080, 6000])
 # most of these are smoketests we can't *really* test, but at least
 # we can check that the server responds.
 @pytest.mark.parametrize("ctx_size", [None, 1024])

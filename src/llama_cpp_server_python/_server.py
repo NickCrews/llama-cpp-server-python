@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import threading
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from llama_cpp_server_python._binary import download_binary
 from llama_cpp_server_python._model import download_model
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    import io
 
 
 class Server:
@@ -32,6 +35,7 @@ class Server:
     >>> model_path = "path/to/model.gguf"
     >>> server = Server(binary_path=binary_path, model_path=model_path, port=6000, ctx_size=1024)
     >>> server.start()
+    >>> server.wait_for_ready()
     >>> client = OpenAI(base_url=server.base_url)
     >>> pass  # interact with the client
     >>> server.stop() # or use a context manager as above
@@ -46,6 +50,7 @@ class Server:
         ctx_size: int | None = None,
         parallel: int | None = None,
         cont_batching: bool = True,
+        logger: logging.Logger | None = None,
     ) -> None:
         """
         Create a server instance (but don't start it yet).
@@ -68,6 +73,11 @@ class Server:
             The number of parallel requests to handle.
         cont_batching :
             Whether to use continuous batching.
+        logger :
+            A logger to use for logging server output.
+            If None, a new logger is created.
+            You can configure the logger with handlers, formatters, etc. after
+            creating the server as needed.
         """
         self.binary_path = Path(binary_path)
         self.model_path = Path(model_path)
@@ -76,8 +86,14 @@ class Server:
         self.parallel = parallel
         self.cont_batching = cont_batching
 
+        self._logging_threads = []
+        self._status = "stopped"
         self.process = None
         self._check_resources()
+
+        if logger is None:
+            logger = logging.getLogger(__name__ + ".Server" + str(self.port))
+        self.logger = logger
 
     @classmethod
     def from_huggingface(
@@ -115,8 +131,16 @@ class Server:
         """The base URL of the server, e.g. 'http://localhost:8080'."""
         return f"http://localhost:{self.port}"
 
+    @property
+    def status(self) -> str:
+        """The status of the server: 'stopped', 'starting', or 'running'."""
+        return self._status
+
     def start(self) -> None:
-        """Start the server in a subprocess. Blocks until the server is ready.
+        """Start the server in a subprocess.
+
+        This returns immediately. If you want to wait for the server to be ready,
+        call 'wait_for_start()' after this.
 
         Pair this with a .stop() call when you are done.
         Or, use a context manager with 'with Server(...) as server: ...'
@@ -127,22 +151,29 @@ class Server:
         if self.process is not None:
             raise RuntimeError("Server is already running.")
         self._check_resources()
-        logger.info(f"Starting server with command: '{' '.join(self._command)}'...")
-        self.process = subprocess.Popen(
-            self._command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        self.logger.info(
+            f"Starting server with command: '{' '.join(self._command)}'..."
         )
-        self._wait_for_start()
+        self.process = subprocess.Popen(
+            self._command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        self._status = "starting"
+        self._logging_threads = self._watch_outputs()
 
     def stop(self) -> None:
         """Terminate the server subprocess. No-op if there is no active subprocess."""
         if self.process is None:
             return
         self.process.kill()
+        for thread in self._logging_threads:
+            thread.join()
+        self._status = "stopped"
         self.process = None
 
     def __enter__(self):
         """Start the server when entering a context manager."""
         self.start()
+        self.wait_for_ready()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -172,20 +203,32 @@ class Server:
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model weights not found at {self.model_path}.")
 
-    def _wait_for_start(self, timeout: int = 5) -> None:
-        if self.process is None:
+    def wait_for_ready(self, *, timeout: int = 5) -> None:
+        """Wait until the server is ready to receive requests."""
+        if self._status == "running":
             return
         start = time.time()
-        outs, errs = b"", b""
         while time.time() - start < timeout:
-            try:
-                outs, errs = self.process.communicate(timeout=0.01)
-            except subprocess.TimeoutExpired:
-                if "HTTP server listening" in errs.decode():
-                    return
-            else:
+            if self.process.poll() is not None:
                 raise RuntimeError(
                     f"Server exited unexpectedly with code {self.process.returncode}."
-                    f" stdout: {outs.decode()}"
-                    f" stderr: {errs.decode()}"
                 )
+            if self._status == "running":
+                self.logger.info("Server started.")
+                return
+            time.sleep(0.1)
+        raise TimeoutError(f"Server did not start within {timeout} seconds.")
+
+    def _watch_outputs(self) -> list[threading.Thread]:
+        def watch(file: io.StringIO):
+            for line in file:
+                line = line.strip()
+                if "HTTP server listening" in line:
+                    self._status = "running"
+                self.logger.info(line)
+
+        std_out_thread = threading.Thread(target=watch, args=(self.process.stdout,))
+        std_err_thread = threading.Thread(target=watch, args=(self.process.stderr,))
+        std_out_thread.start()
+        std_err_thread.start()
+        return [std_out_thread, std_err_thread]

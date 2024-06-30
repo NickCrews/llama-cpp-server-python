@@ -128,8 +128,8 @@ class Server:
 
     @property
     def base_url(self) -> str:
-        """The base URL of the server, e.g. 'http://localhost:8080'."""
-        return f"http://localhost:{self.port}"
+        """The base URL of the server, e.g. 'http://127.0.0.1:8080'."""
+        return f"http://127.0.0.1:{self.port}"
 
     @property
     def status(self) -> str:

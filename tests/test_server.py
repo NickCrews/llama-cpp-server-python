@@ -57,7 +57,7 @@ def test_basic(binary_path: None, model_path, port, ctx_size, parallel, cont_bat
         parallel=parallel,
         cont_batching=cont_batching,
     ) as server:
-        assert server.base_url == "http://localhost:" + (str(port) or "8080")
+        assert server.base_url == "http://127.0.0.1:" + (str(port) or "8080")
         _check_server(server)
 
 
@@ -82,5 +82,5 @@ def test_from_huggingface(tmp_path):
     with Server.from_huggingface(
         repo=REPO, filename=FILENAME, working_dir=tmp_path
     ) as server:
-        assert server.base_url == "http://localhost:8080"
+        assert server.base_url == "http://127.0.0.1:8080"
         _check_server(server)

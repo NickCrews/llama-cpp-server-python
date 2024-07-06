@@ -45,8 +45,8 @@ def _check_server(server: Server):
 @pytest.mark.parametrize("port", [8080, 6000])
 # most of these are smoketests we can't *really* test, but at least
 # we can check that the server responds.
-@pytest.mark.parametrize("ctx_size", [None, 1024])
-@pytest.mark.parametrize("parallel", [None, 8])
+@pytest.mark.parametrize("ctx_size", [512, 1024])
+@pytest.mark.parametrize("parallel", [4, 8])
 @pytest.mark.parametrize("cont_batching", [True, False])
 def test_basic(binary_path: None, model_path, port, ctx_size, parallel, cont_batching):
     with Server(

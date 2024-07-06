@@ -70,12 +70,21 @@ def test_no_resources(binary_path, model_path):
         Server(binary_path="bad_path", model_path=model_path)
 
 
+def test_bad_binary(tmp_path: Path, model_path):
+    binary_path = tmp_path / "bad_server"
+    binary_path.write_text("bad server")
+    server = Server(binary_path=binary_path, model_path=model_path)
+    with pytest.raises(PermissionError):
+        server.start()
+
+
 def test_bad_model(tmp_path: Path, binary_path):
     model_path = tmp_path / "bad_model.gguf"
     model_path.write_text("bad model")
     server = Server(binary_path=binary_path, model_path=model_path)
+    server.start()
     with pytest.raises(RuntimeError):
-        server.start()
+        server.wait_for_ready()
 
 
 def test_from_huggingface(tmp_path):

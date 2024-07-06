@@ -89,14 +89,12 @@ class Server:
         self.parallel = parallel
         self.cont_batching = cont_batching
 
-        self._logging_threads = []
-        self._status = "stopped"
-        self.process = None
         self._check_resources()
 
         if logger is None:
             logger = logging.getLogger(__name__ + ".Server" + str(self.port))
-        self.logger = logger
+        self._logger = logger
+        self._process = None
 
     @classmethod
     def from_huggingface(
@@ -135,9 +133,15 @@ class Server:
         return f"http://127.0.0.1:{self.port}"
 
     @property
-    def status(self) -> str:
-        """The status of the server: 'stopped', 'starting', or 'running'."""
-        return self._status
+    def logger(self) -> logging.Logger:
+        """The logger used for server output."""
+        return self._logger
+
+    @logger.setter
+    def logger(self, logger: logging.Logger):
+        self._logger = logger
+        if self._process is not None:
+            self._process.logger = logger
 
     def start(self) -> None:
         """Start the server in a subprocess.
@@ -151,32 +155,31 @@ class Server:
 
         You can start and stop the server multiple times in a row.
         """
-        if self.process is not None:
+        if self._process is not None:
             raise RuntimeError("Server is already running.")
         self._check_resources()
         self.logger.info(
             f"Starting server with command: '{' '.join(self._command)}'..."
         )
-        self.process = subprocess.Popen(
-            self._command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        self._status = "starting"
-        self._logging_threads = self._watch_outputs()
+        self._process = _RunningServerProcess(self._command, self.logger)
 
     def stop(self) -> None:
         """Terminate the server subprocess. No-op if there is no active subprocess."""
-        if self.process is None:
+        if self._process is None:
             return
-        self.process.kill()
-        for thread in self._logging_threads:
-            thread.join()
-        self._status = "stopped"
-        self.process = None
+        self._process.stop()
+        self._process = None
+
+    def wait_for_ready(self, *, timeout: int = 5) -> None:
+        """Wait until the server is ready to receive requests."""
+        if self._process is None:
+            raise RuntimeError("Server is not running.")
+        self._process.wait_for_ready(timeout=timeout)
 
     def __enter__(self):
         """Start the server when entering a context manager."""
         self.start()
-        self.wait_for_ready()
+        self._process.wait_for_ready()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -200,21 +203,36 @@ class Server:
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model weights not found at {self.model_path}.")
 
+
+class _RunningServerProcess:
+    def __init__(self, args: list[str], logger: logging.Logger) -> None:
+        self.popen = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        self.logger = logger
+        self._logging_threads = self._watch_outputs()
+        self._status = "starting"
+
     def wait_for_ready(self, *, timeout: int = 5) -> None:
-        """Wait until the server is ready to receive requests."""
         if self._status == "running":
             return
         start = time.time()
         while time.time() - start < timeout:
-            if self.process.poll() is not None:
-                raise RuntimeError(
-                    f"Server exited unexpectedly with code {self.process.returncode}."
-                )
+            self._check_not_exited()
             if self._status == "running":
                 self.logger.info("Server started.")
                 return
             time.sleep(0.1)
         raise TimeoutError(f"Server did not start within {timeout} seconds.")
+
+    def _check_not_exited(self) -> None:
+        exit_code = self.popen.poll()
+        if exit_code is None:
+            return
+        self.stop()
+        raise RuntimeError(
+            f"Server exited unexpectedly with code {self.popen.returncode}."
+        )
 
     def _watch_outputs(self) -> list[threading.Thread]:
         def watch(file: io.StringIO):
@@ -224,8 +242,13 @@ class Server:
                     self._status = "running"
                 self.logger.info(line)
 
-        std_out_thread = threading.Thread(target=watch, args=(self.process.stdout,))
-        std_err_thread = threading.Thread(target=watch, args=(self.process.stderr,))
+        std_out_thread = threading.Thread(target=watch, args=(self.popen.stdout,))
+        std_err_thread = threading.Thread(target=watch, args=(self.popen.stderr,))
         std_out_thread.start()
         std_err_thread.start()
         return [std_out_thread, std_err_thread]
+
+    def stop(self):
+        self.popen.kill()
+        for thread in self._logging_threads:
+            thread.join()

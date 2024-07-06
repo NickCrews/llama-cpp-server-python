@@ -47,8 +47,8 @@ class Server:
         binary_path: str | Path,
         model_path: str | Path,
         port: int = 8080,
-        ctx_size: int | None = None,
-        parallel: int | None = None,
+        ctx_size: int = 512,
+        parallel: int = 8,
         cont_batching: bool = True,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -68,7 +68,10 @@ class Server:
         port :
             The port to run the server on.
         ctx_size :
-            The context size of the model.
+            The context size for each request.
+            Note this is a different meaning from how the raw binary interprets it:
+            the raw binary uses this as the total context size, spread across all
+            parallel requests.
         parallel :
             The number of parallel requests to handle.
         cont_batching :
@@ -182,17 +185,11 @@ class Server:
 
     @property
     def _command(self) -> list[str]:
-        cmd = [
-            str(self.binary_path),
-            "--model",
-            str(self.model_path),
-            "--port",
-            f"{self.port}",
-        ]
-        if self.ctx_size is not None:
-            cmd.extend(["--ctx_size", f"{self.ctx_size}"])
-        if self.parallel is not None:
-            cmd.extend(["--parallel", f"{self.parallel}"])
+        cmd = [str(self.binary_path)]
+        cmd.extend(["--model", str(self.model_path)])
+        cmd.extend(["--port", f"{self.port}"])
+        cmd.extend(["--ctx_size", f"{self.ctx_size * self.parallel}"])
+        cmd.extend(["--parallel", f"{self.parallel}"])
         if self.cont_batching:
             cmd.append("--cont_batching")
         return cmd
